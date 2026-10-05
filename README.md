@@ -23,11 +23,14 @@ Le paquet s'appelle `bughouse2v2` (et non `bughouse`) pour ne pas entrer en coll
 ## Installation
 
 Linux / macOS :
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
 Windows (PowerShell) :
+
 ```powershell
 py -m venv .venv ; .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -40,19 +43,20 @@ python play.py                       # tu joues les 4 places   (Windows : py pla
 python play.py --bots BW,BB          # BW et BB jouées par des bots aléatoires
 python play.py --base 60 --increment 1
 ```
+
 Équivalent : `python -m bughouse2v2 ...`.
 
 Places : `AW`/`AB` = Blancs/Noirs de la planche A, `BW`/`BB` = Blancs/Noirs de la planche B.
 Équipe 0 = AW + BB, équipe 1 = AB + BW. Les deux planches tournent en parallèle ; `>` marque les horloges actives.
 
-| Commande | Effet |
-|---|---|
-| `a e2e4` / `b Nf3` / `a P@e5` | joue sur la planche A / B (UCI ou SAN, drops `N@f3`) |
-| `moves a` | liste les coups légaux |
-| `undo` | annule le dernier coup (toutes planches), rembobine les horloges |
-| `pause` / `resume` | fige / relance les horloges |
-| `resign BB` | la place abandonne |
-| `show`, `help`, `quit` | affichage, aide, sortie |
+| Commande                            | Effet                                                            |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| `a e2e4` / `b Nf3` / `a P@e5` | joue sur la planche A / B (UCI ou SAN, drops`N@f3`)            |
+| `moves a`                         | liste les coups légaux                                          |
+| `undo`                            | annule le dernier coup (toutes planches), rembobine les horloges |
+| `pause` / `resume`              | fige / relance les horloges                                      |
+| `resign BB`                       | la place abandonne                                               |
+| `show`, `help`, `quit`        | affichage, aide, sortie                                          |
 
 ## Interface graphique (tkinter)
 
@@ -60,6 +64,7 @@ Places : `AW`/`AB` = Blancs/Noirs de la planche A, `BW`/`BB` = Blancs/Noirs de l
 python play_gui.py                          # Windows : py play_gui.py
 python play_gui.py --bots BW,BB --base 120 --increment 1
 ```
+
 - **Jouer un coup** : clic sur une de tes pièces, puis sur la case d'arrivée (les coups possibles sont marqués, les captures par un anneau). La promotion ouvre un petit choix.
 - **Poser une pièce** (drop) : clic sur la pièce dans ta poche (à côté de l'horloge), puis sur une case libre. Re-clic = désélection.
 - **Annuler** : bouton ou Ctrl+Z (remet aussi les horloges). **Pause**, **Abandon**, **Nouvelle partie** (base et incrément modifiables).
@@ -81,6 +86,7 @@ python -m bughouse2v2.sim --seed 1 --base 180 --log
 ```bash
 python -m pytest        # ou simplement : pytest
 ```
+
 Les tests de la fenêtre sont ignorés automatiquement s'il n'y a ni tkinter ni écran
 (Linux sans affichage : `xvfb-run -a python -m pytest`).
 

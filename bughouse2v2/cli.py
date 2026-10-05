@@ -205,7 +205,8 @@ def main(argv: list[str] | None = None) -> None:
 
     seats = [parse_seat(s) for s in args.bots.split(",") if s.strip()]
     make = MinimaxPlayer if args.bot_type == "minimax" else RandomPlayer
-    bots: dict[Seat, Player] = {s: make(f"bot-{s}") for s in seats if s in ALL_SEATS}    game = Game(TimeControl(args.base, args.increment), now=monotonic)
+    bots: dict[Seat, Player] = {s: make(f"bot-{s}") for s in seats if s in ALL_SEATS}    
+    game = Game(TimeControl(args.base, args.increment), now=monotonic)
     try:
         run(game, bots, bot_delay=args.bot_delay)
     except KeyboardInterrupt:
