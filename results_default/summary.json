@@ -1,0 +1,205 @@
+{
+  "config": {
+    "games": 200,
+    "seed": 42,
+    "base": 180.0,
+    "increment": 0.0,
+    "think_min": 0.3,
+    "think_max": 3.0,
+    "max_plies": 2000,
+    "max_virtual_seconds": 3600.0,
+    "max_depth": 6,
+    "min_time": 0.05,
+    "max_time": 1.0,
+    "gamma": 0.9,
+    "hand_bonus": 0.5,
+    "moves_to_go": 40,
+    "f_pawn_weight": 40.0
+  },
+  "games_recorded": 23,
+  "completed": 23,
+  "unfinished": 0,
+  "unfinished_reasons": {},
+  "bots": {
+    "minimax": {
+      "wins": 23,
+      "win_rate_completed": 1.0,
+      "win_virtual_seconds": {
+        "n": 23,
+        "mean": 30.892307298751813,
+        "median": 27.879024936793996,
+        "p95": 56.346987514239316,
+        "stdev": 13.428715869568245
+      },
+      "win_wall_seconds": {
+        "n": 23,
+        "mean": 14.90575102608747,
+        "median": 13.282032999995863,
+        "p95": 23.630658899986884,
+        "stdev": 6.5133112491338645
+      },
+      "win_plies": {
+        "n": 23,
+        "mean": 35.95652173913044,
+        "median": 32,
+        "p95": 57,
+        "stdev": 14.430013736746329
+      },
+      "choice_seconds": {
+        "n": 420,
+        "mean": 0.8154412952370227,
+        "median": 1.002444249985274,
+        "p95": 1.0272756000049412,
+        "stdev": 0.3006772969982609
+      },
+      "nodes": {
+        "n": 420,
+        "mean": 12218.666666666666,
+        "median": 11264.0,
+        "p95": 27136,
+        "stdev": 7473.069617736436
+      },
+      "completed_depth": {
+        "n": 420,
+        "mean": 3.3047619047619046,
+        "median": 3.0,
+        "p95": 4,
+        "stdev": 0.88879322893229
+      },
+      "captures": 157,
+      "capture_value": 50100,
+      "drops": 76,
+      "checks": 99,
+      "promotions": 7,
+      "captures_per_100_moves": 37.38095238095238,
+      "drops_per_100_moves": 18.095238095238095,
+      "wins_by_reason": {
+        "mat": 23
+      }
+    },
+    "random": {
+      "wins": 0,
+      "win_rate_completed": 0.0,
+      "win_virtual_seconds": {
+        "n": 0,
+        "mean": null,
+        "median": null,
+        "p95": null,
+        "stdev": null
+      },
+      "win_wall_seconds": {
+        "n": 0,
+        "mean": null,
+        "median": null,
+        "p95": null,
+        "stdev": null
+      },
+      "win_plies": {
+        "n": 0,
+        "mean": null,
+        "median": null,
+        "p95": null,
+        "stdev": null
+      },
+      "choice_seconds": {
+        "n": 407,
+        "mean": 0.00014449066474761456,
+        "median": 0.00011739999172277749,
+        "p95": 0.0002646000066306442,
+        "stdev": 0.00014701104821196738
+      },
+      "nodes": {
+        "n": 0,
+        "mean": null,
+        "median": null,
+        "p95": null,
+        "stdev": null
+      },
+      "completed_depth": {
+        "n": 0,
+        "mean": null,
+        "median": null,
+        "p95": null,
+        "stdev": null
+      },
+      "captures": 20,
+      "capture_value": 7000,
+      "drops": 16,
+      "checks": 1,
+      "promotions": 0,
+      "captures_per_100_moves": 4.914004914004914,
+      "drops_per_100_moves": 3.9312039312039313,
+      "wins_by_reason": {}
+    }
+  },
+  "by_minimax_seats": {
+    "AW+BB": {
+      "games": 12,
+      "completed": 12,
+      "minimax_wins": 12,
+      "random_wins": 0,
+      "unfinished": 0
+    },
+    "AB+BW": {
+      "games": 11,
+      "completed": 11,
+      "minimax_wins": 11,
+      "random_wins": 0,
+      "unfinished": 0
+    }
+  },
+  "complete_pairs": 11,
+  "paired_minimax_score": 1.0,
+  "paired_bootstrap_95_percent": [
+    1.0,
+    1.0
+  ],
+  "pair_outcomes": {
+    "1.0": 11
+  },
+  "virtual_seconds": {
+    "n": 23,
+    "mean": 30.892307298751813,
+    "median": 27.879024936793996,
+    "p95": 56.346987514239316,
+    "stdev": 13.428715869568245
+  },
+  "wall_seconds": {
+    "n": 23,
+    "mean": 14.90575102608747,
+    "median": 13.282032999995863,
+    "p95": 23.630658899986884,
+    "stdev": 6.5133112491338645
+  },
+  "total_game_wall_seconds": 342.83227360001183,
+  "environment": {
+    "python": "3.13.15",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "chess": "1.11.2"
+  },
+  "source_sha256": {
+    "benchmark.py": "ecfb9dde512ed2af9f38ee09658c21b48c3f496323b7a8afddda77eac99b3a3d",
+    "cli.py": "b554a07af3184dbea1bb23da86a8b49af4c85e8a673c584e65a535dfe10613df",
+    "clock.py": "a159592167bb09de5ffcc157e288841a2aebea9c132aea0f9731ee0745c54d95",
+    "game.py": "589a97b7dd0732942a00994dcbf6943b61114a2cecf57a60a496f729149d8d87",
+    "gui.py": "88cc385a42a892a44d00b50c2bc9c32dc735f5e0b102228d6abd91458a5d93c1",
+    "interaction.py": "6b0e3517e453279fa6c58080d6532d913daa60abcf616ef1d58589837c333592",
+    "minimax.py": "a846da1a87ed58974ad90432f18b1951889d0c701284ac5b92df1dce4595722a",
+    "players.py": "59c210e707984a6796c47538c7afdd721385420ebc1ba066bdfd1f21c4c14d37",
+    "seat.py": "59cb96adcb892b9d4958f14884d090bea418e24b00b082e0c98b863ff78db4ce",
+    "sim.py": "7f29637acc1e14eb9a79b26f4e14deb20e868be7562a46b34301c4b160824dce",
+    "__init__.py": "f61ebe990e75a9a6a966b479efecb3886c7d2ee87ac7e4d32f0983eb5aa4044a",
+    "__main__.py": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279"
+  },
+  "notes": [
+    "Horloges virtuelles : mêmes distributions de délai pour les deux bots.",
+    "Temps de calcul réel mesuré, mais non déduit des horloges virtuelles.",
+    "Les victoires suivent les règles du Game fourni, y compris les mats différés.",
+    "Une limite atteinte est une partie inachevée, jamais une nulle ou une défaite.",
+    "Les moyennes de victoire concernent uniquement les parties gagnées.",
+    "Bootstrap des paires complètes : exploratoire, peut dégénérer à 100 % de victoires.",
+    "Les graines ne garantissent pas les mêmes coups avec une recherche limitée en temps.",
+    "Ce tournoi contre random ne mesure pas un Elo."
+  ],
+  "interrupted": true
+}

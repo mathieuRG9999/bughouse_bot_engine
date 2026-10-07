@@ -120,10 +120,20 @@ class MinimaxPlayer:
         attackers = len(board.attackers(not color, sq))
         return self.f_pawn_weight * (min(defenders, 3) - attackers)
 
-    def _eval(self, board: chess.Board) -> float:
-        """Évaluation à l'horizon, du point de vue du camp au trait (négamax)."""
+    def _eval(self, board):
         me = board.turn
-        return self._f_pawn_safety(board, me) - self._f_pawn_safety(board, not me)
+
+        king_safety = (
+            self._f_pawn_safety(board, me)
+            - self._f_pawn_safety(board, not me)
+        )
+
+        center = (
+            self._center_score(board, me)
+            - self._center_score(board, not me)
+        )
+
+        return 2*king_safety + center
 
     def _gain(self, move: chess.Move, victim: int | None) -> float:
         g = VALUES[victim] * (1 + self.hand_bonus) if victim else 0.0
@@ -167,6 +177,30 @@ class MinimaxPlayer:
                 best_move, best_val = move, v
             alpha = max(alpha, v)
         return best_move, best_val
+
+
+    def _center_score(self, board, color):
+        score = 0.0
+        for square in (chess.D4, chess.E4, chess.D5, chess.E5):
+            piece = board.piece_at(square)
+
+            if piece is not None and piece.color == color:
+                if piece.piece_type == chess.PAWN:
+                    score += 20
+                elif piece.piece_type in (chess.KNIGHT, chess.BISHOP):
+                    score += 12
+
+            for origin in board.attackers(color, square):
+                attacker = board.piece_at(origin)
+
+                if attacker.piece_type == chess.PAWN:
+                    score += 8
+                elif attacker.piece_type in (chess.KNIGHT, chess.BISHOP):
+                    score += 5
+                elif attacker.piece_type in (chess.ROOK, chess.QUEEN):
+                    score += 2
+
+        return score
 
     def _search(self, board: chess.Board, depth: int, alpha: float, beta: float) -> float:
         """Valeur du point de vue du camp au trait. Gain d'un coup = prise (x bonus) + promotion ;

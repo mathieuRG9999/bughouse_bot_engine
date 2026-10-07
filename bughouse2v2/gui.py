@@ -7,9 +7,11 @@ Jouer : clic sur une de tes pièces puis sur la case d'arrivée (les coups possi
 marqués). Pour poser une pièce de ta poche : clic sur la pièce dans la poche, puis sur une
 case libre. Ctrl+Z annule le dernier coup. Cocher « Bot » à côté d'une place la fait jouer
 par ``RandomPlayer`` (ou par le joueur que tu passes à ``App(players=...)``).
+
+Pièces optionnelles : dépose des PNG (wK.png, wQ.png, wR.png, wB.png, wN.png, wP.png,
+bK.png, ... à la taille SQUARE) dans bughouse2v2/pieces/ ; sinon les glyphes Unicode sont utilisés.
 """
 from __future__ import annotations
-import os
 
 if __package__ in (None, ""):  # lancé comme un simple script (python gui.py, bouton « Run » d'un IDE)
     import os
@@ -28,6 +30,7 @@ if __package__ in (None, ""):  # lancé comme un simple script (python gui.py, b
     raise SystemExit
 
 import argparse
+import os
 import platform
 import random
 
@@ -50,17 +53,78 @@ from .minimax import MinimaxPlayer
 from .seat import ALL_SEATS, Seat
 
 SQUARE = 56  # taille d'une case en pixels
-LIGHT, DARK = "#f0d9b5", "#b58863"
-SELECT_COLOR, CHECK_COLOR = "#f6f669", "#e8575a"
-LAST_LIGHT, LAST_DARK = "#cdd26a", "#aaa23a"
-TARGET_COLOR = "#4f6f3a"
-CLOCK_ON, CLOCK_OFF, CLOCK_LOW = "#ffe08a", "#eeeeee", "#ff9b9b"
 
+# --- thème ---
+BG, PANEL, PANEL_2, HOVER = "#1e1f22", "#2b2d31", "#3a3d44", "#4a4d55"
+FG, MUTED = "#e6e6e6", "#9aa0a6"
+TEAM_COLORS = ("#7fb8ff", "#ffb36b")  # AW+BB / AB+BW
+
+LIGHT, DARK = "#eeeed2", "#769656"  # plateau « vert »
+LAST_LIGHT, LAST_DARK = "#f5f682", "#b9ca43"
+SELECT_COLOR, CHECK_COLOR = "#ffd24d", "#e8575a"
+# (fond, texte)
+CLOCK_ON, CLOCK_OFF, CLOCK_LOW = ("#f2f2f2", "#111111"), (PANEL_2, MUTED), ("#d64545", "#ffffff")
+
+MONO = {"Windows": "Consolas", "Darwin": "Menlo"}.get(platform.system(), "DejaVu Sans Mono")
 PIECE_FONT = {"Windows": "Segoe UI Symbol", "Darwin": "Apple Symbols"}.get(platform.system(), "DejaVu Sans")
 GLYPH_FILLED = {chess.PAWN: "♟", chess.KNIGHT: "♞", chess.BISHOP: "♝", chess.ROOK: "♜", chess.QUEEN: "♛", chess.KING: "♚"}
 GLYPH_HOLLOW = {chess.PAWN: "♙", chess.KNIGHT: "♘", chess.BISHOP: "♗", chess.ROOK: "♖", chess.QUEEN: "♕", chess.KING: "♔"}
 POCKET_ORDER = (chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT, chess.PAWN)
 BOT_TYPES = {"Aléatoire": RandomPlayer, "Minimax": MinimaxPlayer}
+
+
+def blend(c1: str, c2: str, t: float) -> str:
+    """Mélange deux couleurs #rrggbb (simule une transparence)."""
+    a = [int(c1[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(c2[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+
+
+def team_of(seat: Seat) -> int:
+    return 0 if (seat.board == 0) == (seat.color == chess.WHITE) else 1
+
+
+def apply_theme(root: tk.Tk) -> None:
+    root.configure(bg=BG)
+    o = root.option_add
+    o("*Background", BG); o("*Foreground", FG)
+    o("*Font", "TkDefaultFont")
+    o("*Button.Background", PANEL_2); o("*Button.Foreground", FG)
+    o("*Button.activeBackground", HOVER); o("*Button.activeForeground", FG)
+    o("*Button.relief", "flat"); o("*Button.borderWidth", 0)
+    o("*Button.highlightThickness", 0); o("*Button.cursor", "hand2")
+    o("*Button.padX", 10); o("*Button.padY", 4)
+    o("*Menubutton.Background", PANEL_2); o("*Menubutton.activeBackground", HOVER)
+    o("*Menubutton.relief", "flat"); o("*Menubutton.borderWidth", 0)
+    o("*Menubutton.highlightThickness", 0); o("*Menubutton.padX", 8)
+    o("*Menu.Background", PANEL_2); o("*Menu.Foreground", FG)
+    o("*Menu.activeBackground", HOVER); o("*Menu.borderWidth", 0)
+    o("*Checkbutton.selectColor", PANEL_2); o("*Checkbutton.activeBackground", BG)
+    o("*Checkbutton.activeForeground", FG); o("*Checkbutton.highlightThickness", 0)
+    o("*Entry.Background", PANEL_2); o("*Entry.Foreground", FG)
+    o("*Entry.insertBackground", FG); o("*Entry.relief", "flat")
+    o("*Entry.highlightThickness", 1); o("*Entry.highlightBackground", PANEL_2)
+    o("*Entry.highlightColor", "#5b9bd5")
+    o("*Scale.troughColor", PANEL_2); o("*Scale.highlightThickness", 0)
+    o("*Scale.borderWidth", 0); o("*Scale.activeBackground", HOVER)
+    o("*Text.Background", PANEL); o("*Text.Foreground", FG)
+    o("*Text.relief", "flat"); o("*Text.highlightThickness", 0)
+    o("*Scrollbar.Background", PANEL_2); o("*Scrollbar.troughColor", PANEL)
+    o("*Scrollbar.borderWidth", 0); o("*Scrollbar.relief", "flat")
+
+
+_IMG: dict[str, tk.PhotoImage | None] = {}
+
+
+def piece_image(piece: chess.Piece) -> tk.PhotoImage | None:
+    """Image PNG de la pièce si le dossier pieces/ existe, sinon None (repli sur les glyphes)."""
+    key = ("w" if piece.color == chess.WHITE else "b") + piece.symbol().upper()
+    if key not in _IMG:
+        try:
+            _IMG[key] = tk.PhotoImage(file=os.path.join(os.path.dirname(__file__), "pieces", key + ".png"))
+        except tk.TclError:
+            _IMG[key] = None
+    return _IMG[key]
 
 
 def format_time(t: float) -> str:
@@ -83,10 +147,10 @@ class SeatBar:
 
     def __init__(self, app: "App", parent: tk.Widget, seat: Seat) -> None:
         self.app, self.seat = app, seat
-        self.frame = tk.Frame(parent, bd=1, relief=tk.SOLID, padx=4, pady=2)
-        self.title = tk.Label(self.frame, anchor="w", font=("TkDefaultFont", 10, "bold"))
-        self.clock = tk.Label(self.frame, width=7, font=("Courier", 16, "bold"))
-        self.pocket = tk.Frame(self.frame)
+        self.frame = tk.Frame(parent, bg=PANEL, padx=10, pady=6)
+        self.title = tk.Label(self.frame, anchor="w", bg=PANEL, fg=FG, font=("TkDefaultFont", 10, "bold"))
+        self.clock = tk.Label(self.frame, width=7, font=(MONO, 17, "bold"), padx=6, pady=1)
+        self.pocket = tk.Frame(self.frame, bg=PANEL)
         self.title.pack(side=tk.LEFT)
         self.clock.pack(side=tk.LEFT, padx=8)
         self.pocket.pack(side=tk.LEFT)
@@ -96,14 +160,16 @@ class SeatBar:
         app, g, seat = self.app, self.app.game, self.seat
         t = g.time_left(seat)
         running = seat in g.active_seats and not g.clocks.paused
-        self.clock.config(
-            text=format_time(t),
-            bg=(CLOCK_LOW if t < 10 and running else CLOCK_ON if running else CLOCK_OFF),
-        )
+        bg, fg = CLOCK_LOW if (t < 10 and running) else CLOCK_ON if running else CLOCK_OFF
+        self.clock.config(text=format_time(t), bg=bg, fg=fg)
         name = "Blancs" if seat.color == chess.WHITE else "Noirs"
-        bot = " [bot]" if app.bot_vars[seat].get() else ""
-        blocked = " — bloqué, attend une pièce" if running and g.is_blocked(seat.board) else ""
-        self.title.config(text=f"{seat} {name}{bot}{blocked}")
+        bot = "  🤖" if app.bot_vars[seat].get() else ""
+        blocked = "  — bloqué, attend une pièce" if running and g.is_blocked(seat.board) else ""
+        dot = "● " if running else "   "
+        self.title.config(
+            text=f"{dot}{seat} {name}{bot}{blocked}",
+            fg=TEAM_COLORS[team_of(seat)] if running else MUTED,
+        )
 
         pocket = g.pocket(seat.board, seat.color)
         inter = app.inter
@@ -124,13 +190,15 @@ class SeatBar:
                 self.pocket,
                 text=f"{glyph}{n}",
                 font=(PIECE_FONT, 16),
-                padx=3,
+                padx=5,
                 pady=0,
                 state=tk.NORMAL if can_drop else tk.DISABLED,
-                bg=SELECT_COLOR if pt == picked else "#f4f4f4",
-                relief=tk.SUNKEN if pt == picked else tk.RAISED,
+                disabledforeground=MUTED,
+                bg=SELECT_COLOR if pt == picked else PANEL_2,
+                fg="#111111" if pt == picked else FG,
+                activebackground=HOVER,
                 command=lambda pt=pt: app.on_pocket(seat.board, seat.color, pt),
-            ).pack(side=tk.LEFT, padx=1)
+            ).pack(side=tk.LEFT, padx=2)
 
 
 class BoardView:
@@ -139,7 +207,7 @@ class BoardView:
         self.frame = tk.Frame(parent, padx=6, pady=4)
         head = tk.Frame(self.frame)
         head.grid(row=0, column=0, sticky="ew")
-        tk.Label(head, text=f"Planche {'AB'[idx]}", font=("TkDefaultFont", 11, "bold")).pack(side=tk.LEFT)
+        tk.Label(head, text=f"Planche {'AB'[idx]}", font=("TkDefaultFont", 11, "bold"), fg=FG).pack(side=tk.LEFT)
         tk.Button(head, text="⟲ retourner", command=self.flip).pack(side=tk.RIGHT)
         self.bars = {c: SeatBar(app, self.frame, Seat(idx, c)) for c in (chess.WHITE, chess.BLACK)}
         side = 8 * SQUARE
@@ -212,23 +280,28 @@ class BoardView:
             if piece:
                 self._piece(x, y, piece)
             if sq in targets:
-                m, r = SQUARE // 2, SQUARE // 7
-                if piece:
-                    c.create_oval(x + 3, y + 3, x + SQUARE - 3, y + SQUARE - 3, outline=TARGET_COLOR, width=4)
+                m, r = SQUARE // 2, SQUARE // 6
+                dot = blend(color, "#000000", 0.22)  # marqueur « translucide » adapté à la case
+                if piece:  # capture : anneau
+                    c.create_oval(x + 3, y + 3, x + SQUARE - 3, y + SQUARE - 3, outline=dot, width=5)
                 else:
-                    c.create_oval(x + m - r, y + m - r, x + m + r, y + m + r, fill=TARGET_COLOR, outline="")
+                    c.create_oval(x + m - r, y + m - r, x + m + r, y + m + r, fill=dot, outline="")
             tint = DARK if light else LIGHT
             if (self.flipped and chess.square_rank(sq) == 7) or (not self.flipped and chess.square_rank(sq) == 0):
-                c.create_text(x + SQUARE - 7, y + SQUARE - 8, text="abcdefgh"[chess.square_file(sq)], fill=tint, font=("TkDefaultFont", 8, "bold"))
+                c.create_text(x + SQUARE - 7, y + SQUARE - 8, text="abcdefgh"[chess.square_file(sq)], fill=tint, font=("TkDefaultFont", 9, "bold"))
             if (self.flipped and chess.square_file(sq) == 7) or (not self.flipped and chess.square_file(sq) == 0):
-                c.create_text(x + 7, y + 8, text=str(chess.square_rank(sq) + 1), fill=tint, font=("TkDefaultFont", 8, "bold"))
+                c.create_text(x + 7, y + 8, text=str(chess.square_rank(sq) + 1), fill=tint, font=("TkDefaultFont", 9, "bold"))
 
     def _piece(self, x: int, y: int, piece: chess.Piece) -> None:
         cx, cy = x + SQUARE // 2, y + SQUARE // 2 + 1
+        img = piece_image(piece)
+        if img:
+            self.canvas.create_image(cx, y + SQUARE // 2, image=img)
+            return
         font = (PIECE_FONT, -int(SQUARE * 0.78))
         glyph = GLYPH_FILLED[piece.piece_type]
         fill, edge = ("#ffffff", "#1a1a1a") if piece.color == chess.WHITE else ("#161616", "#e8e8e8")
-        for dx, dy in ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)):
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):  # 4 contours : plus léger
             self.canvas.create_text(cx + dx, cy + dy, text=glyph, font=font, fill=edge)
         self.canvas.create_text(cx, cy, text=glyph, font=font, fill=fill)
 
@@ -245,6 +318,7 @@ class App:
         bot_type: str = "Aléatoire",
     ) -> None:
         self.root = root
+        apply_theme(root)  # avant la création des widgets
         self.bot_type = {s: tk.StringVar(value=bot_type) for s in ALL_SEATS}
         self.players: dict[Seat, Player] = {s: BOT_TYPES[bot_type](f"bot-{s}") for s in ALL_SEATS}
         self.bot_vars = {s: tk.BooleanVar(value=s in bots) for s in ALL_SEATS}
@@ -279,7 +353,7 @@ class App:
         tk.Button(bar, text="↶ Annuler (Ctrl+Z)", command=self.undo).pack(side=tk.LEFT, padx=2)
         self.pause_btn = tk.Button(bar, text="⏸ Pause", width=10, command=self.toggle_pause)
         self.pause_btn.pack(side=tk.LEFT, padx=2)
-        mb = tk.Menubutton(bar, text="Abandon ▾", relief=tk.RAISED)
+        mb = tk.Menubutton(bar, text="Abandon ▾")
         menu = tk.Menu(mb, tearoff=0)
         for seat in ALL_SEATS:
             menu.add_command(label=f"{seat} abandonne", command=lambda s=seat: self.resign(s))
@@ -296,7 +370,7 @@ class App:
             ).pack(side=tk.LEFT, padx=(0, 8))
         tk.Label(bots, text="  délai bots (s)").pack(side=tk.LEFT)
         tk.Scale(bots, variable=self.delay_var, from_=0.0, to=3.0, resolution=0.1, orient=tk.HORIZONTAL, length=120).pack(side=tk.LEFT)
-        tk.Label(bots, text="   Équipes : AW+BB  contre  AB+BW", fg="#555555").pack(side=tk.LEFT)
+        tk.Label(bots, text="   Équipes : AW+BB  contre  AB+BW", fg=MUTED).pack(side=tk.LEFT)
 
         mid = tk.Frame(root)
         mid.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -309,16 +383,21 @@ class App:
         tk.Label(side, text="Coups", font=("TkDefaultFont", 11, "bold")).pack(anchor="w")
         box = tk.Frame(side)
         box.pack(fill=tk.BOTH, expand=True)
-        self.log = tk.Text(box, width=30, height=24, state=tk.DISABLED, font=("Courier", 10), wrap="none")
+        self.log = tk.Text(box, width=30, height=24, state=tk.DISABLED, font=(MONO, 10), wrap="none",
+                           padx=8, pady=6, spacing1=2)
+        self.log.tag_configure("t0", foreground=TEAM_COLORS[0])
+        self.log.tag_configure("t1", foreground=TEAM_COLORS[1])
+        self.log.tag_configure("cap", foreground=MUTED)
         scroll = tk.Scrollbar(box, command=self.log.yview)
         self.log.config(yscrollcommand=scroll.set)
         self.log.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll.pack(side=tk.LEFT, fill=tk.Y)
 
-        status = tk.Frame(root, bd=1, relief=tk.SUNKEN)
+        status = tk.Frame(root, bg=PANEL)
         status.pack(side=tk.BOTTOM, fill=tk.X)
-        tk.Label(status, textvariable=self.state_var, anchor="w", font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT, padx=6)
-        tk.Label(status, textvariable=self.msg_var, anchor="w").pack(side=tk.LEFT, padx=6)
+        self.state_lbl = tk.Label(status, textvariable=self.state_var, anchor="w", bg=PANEL, font=("TkDefaultFont", 10, "bold"))
+        self.state_lbl.pack(side=tk.LEFT, padx=6, pady=3)
+        tk.Label(status, textvariable=self.msg_var, anchor="w", bg=PANEL, fg=MUTED).pack(side=tk.LEFT, padx=6)
 
     # ------------------------------------------------------------------
     # Actions
@@ -464,8 +543,10 @@ class App:
         if g.is_over:
             r = g.result
             self.state_var.set(f"TERMINÉE — {team_name(r.winner)} gagne ({r.reason.value}, perdant : {r.loser})")
+            self.state_lbl.config(fg="#ff7b7b")
         else:
             self.state_var.set("PAUSE" if g.clocks.paused else "En cours")
+            self.state_lbl.config(fg="#ffb347" if g.clocks.paused else "#7bd88f")
 
     def _update_log(self) -> None:
         hist = self.game.history
@@ -473,13 +554,13 @@ class App:
         if sig == self._log_sig:
             return
         self._log_sig = sig
-        lines = []
-        for e in hist:
-            cap = f"  +{GLYPH_HOLLOW[e.captured]}→{e.seat.partner}" if e.captured else ""
-            lines.append(f"{e.ply:3d}. {e.seat}  {e.san}{cap}")
         self.log.config(state=tk.NORMAL)
         self.log.delete("1.0", tk.END)
-        self.log.insert(tk.END, "\n".join(lines))
+        for e in hist:
+            self.log.insert(tk.END, f"{e.ply:3d}. {e.seat}  {e.san}", f"t{team_of(e.seat)}")
+            if e.captured:
+                self.log.insert(tk.END, f"  +{GLYPH_HOLLOW[e.captured]}→{e.seat.partner}", "cap")
+            self.log.insert(tk.END, "\n")
         self.log.see(tk.END)
         self.log.config(state=tk.DISABLED)
 
@@ -498,7 +579,6 @@ def main(argv: list[str] | None = None) -> None:
         root = tk.Tk()
     except tk.TclError as exc:
         raise SystemExit(f"Impossible d'ouvrir une fenêtre : {exc}")
-    # make = MinimaxPlayer if args.bot_type == "minimax" else RandomPlayer
     App(root, TimeControl(args.base, args.increment), bots=seats,
         bot_type="Minimax" if args.bot_type == "minimax" else "Aléatoire")
     root.mainloop()
