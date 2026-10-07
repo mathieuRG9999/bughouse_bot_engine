@@ -37,6 +37,7 @@ from typing import Callable, TextIO
 
 import chess
 
+from .async_bots import AsyncBots
 from .clock import TimeControl, monotonic
 from .game import BughouseError, Game, IllegalMoveError
 from .players import Player, RandomPlayer
@@ -133,8 +134,12 @@ def run(
     bot_delay: float = 1.0,
     inp: TextIO = sys.stdin,
     out: Callable[[str], None] = lambda s: print(s, flush=True),
+    runner: AsyncBots | None = None,
 ) -> None:
+    """``runner`` : calcul des bots. Par défaut synchrone (``AsyncBots(workers=0)``) ; ``main()``
+    passe un ``AsyncBots()`` à processus pour que les deux planches réfléchissent en même temps."""
     bots = bots or {}
+    runner = runner or AsyncBots(workers=0)
     lines: queue.Queue[str | None] = queue.Queue()
 
     def reader() -> None:
@@ -148,7 +153,6 @@ def run(
     out(HELP + "\n")
     out(game.render())
     rng = random.Random()
-    ready: dict[int, float | None] = {0: None, 1: None}
     announced = False
 
     while True:
@@ -165,27 +169,20 @@ def run(
                 out(msg)
             if quit_:
                 return
-            ready = {0: None, 1: None}  # un coup ou un undo peut avoir changé qui est au trait
+            if line.lower().split()[:1] in (["undo"], ["u"]):
+                runner.reset()  # les calculs en cours portent sur une position annulée
 
         if not game.is_over and game.check_time() is not None:
             out(game.render())
 
-        now = monotonic()
-        for b in (0, 1):
-            seat = Seat(b, game.turn(b))
-            if game.is_over or seat not in bots or game.clocks.paused or game.is_blocked(b):
-                ready[b] = None
-                continue
-            if ready[b] is None:
-                ready[b] = now + bot_delay * rng.uniform(0.5, 1.5)
-            elif now >= ready[b]:
-                try:
-                    entry = game.push(b, bots[seat].choose_move(game, b))
-                except BughouseError:
-                    ready[b] = None
-                    continue
-                ready[b] = None
-                out(f"[bot] {entry.seat} joue {entry.san}\n{game.render()}")
+        for entry in runner.poll(
+            game,
+            bots,
+            enabled=lambda s: s in bots,
+            delay=lambda: bot_delay * rng.uniform(0.5, 1.5),
+            on_error=out,
+        ):
+            out(f"[bot] {entry.seat} joue {entry.san}\n{game.render()}")
 
         if game.is_over and not announced:
             announced = True
@@ -207,10 +204,15 @@ def main(argv: list[str] | None = None) -> None:
     make = MinimaxPlayer if args.bot_type == "minimax" else RandomPlayer
     bots: dict[Seat, Player] = {s: make(f"bot-{s}") for s in seats if s in ALL_SEATS}    
     game = Game(TimeControl(args.base, args.increment), now=monotonic)
+    runner = AsyncBots(workers=2 if bots else 0)
+    if runner.fallback_reason:
+        print(runner.fallback_reason)
     try:
-        run(game, bots, bot_delay=args.bot_delay)
+        run(game, bots, bot_delay=args.bot_delay, runner=runner)
     except KeyboardInterrupt:
         print("\ninterrompu")
+    finally:
+        runner.shutdown()
 
 
 if __name__ == "__main__":

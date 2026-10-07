@@ -45,6 +45,7 @@ except ImportError:  # tkinter est une option d'installation de Python sous Linu
 import chess
 
 
+from .async_bots import AsyncBots
 from .clock import TimeControl, monotonic
 from .game import BughouseError, Game, HistoryEntry
 from .interaction import Interaction
@@ -163,7 +164,9 @@ class SeatBar:
         bg, fg = CLOCK_LOW if (t < 10 and running) else CLOCK_ON if running else CLOCK_OFF
         self.clock.config(text=format_time(t), bg=bg, fg=fg)
         name = "Blancs" if seat.color == chess.WHITE else "Noirs"
-        bot = "  🤖" if app.bot_vars[seat].get() else ""
+        bot = ""
+        if app.bot_vars[seat].get():
+            bot = "  🤖 réfléchit…" if app.async_bots.is_thinking(seat) else "  🤖"
         blocked = "  — bloqué, attend une pièce" if running and g.is_blocked(seat.board) else ""
         dot = "● " if running else "   "
         self.title.config(
@@ -316,6 +319,7 @@ class App:
         *,
         bots: set[Seat] | frozenset[Seat] = frozenset(),
         bot_type: str = "Aléatoire",
+        parallel: bool = True,
     ) -> None:
         self.root = root
         apply_theme(root)  # avant la création des widgets
@@ -327,7 +331,9 @@ class App:
         self.delay_var = tk.DoubleVar(value=0.8)
         self.msg_var = tk.StringVar(value="")
         self.state_var = tk.StringVar(value="")
-        self.ready: dict[int, float | None] = {0: None, 1: None}
+        self.async_bots = AsyncBots(workers=2 if parallel else 0)
+        self._closed = False
+        self._after_id = None
         self._log_sig: object = None
         self.game = Game(control, now=monotonic)
         self.inter = Interaction(self.game)
@@ -336,6 +342,7 @@ class App:
         self._build()
         self.new_game()
         root.bind("<Control-z>", lambda _e: self.undo())
+        root.protocol("WM_DELETE_WINDOW", self.close)
         self._tick()
 
     # ------------------------------------------------------------------
@@ -416,7 +423,7 @@ class App:
         self.game = Game(control, now=monotonic)
         self.game.start()
         self.inter = Interaction(self.game)
-        self.ready = {0: None, 1: None}
+        self.async_bots.reset()
         self._log_sig = None
         for bv in self.boards:
             bv._sig = None
@@ -428,13 +435,13 @@ class App:
     def undo(self) -> None:
         entry = self.game.undo()
         self.inter.clear()
-        self.ready = {0: None, 1: None}
+        self.async_bots.reset()
         self.say(f"annulé : {entry.seat} {entry.san}" if entry else "rien à annuler")
         self.refresh()
 
     def _bot_type_changed(self, seat: Seat) -> None:
         self.players[seat] = BOT_TYPES[self.bot_type[seat].get()](f"bot-{seat}")
-        self.ready = {0: None, 1: None}
+        self.async_bots.reset()
 
     def toggle_pause(self) -> None:
         try:
@@ -455,7 +462,7 @@ class App:
         self.refresh()
 
     def _bots_changed(self) -> None:
-        self.ready = {0: None, 1: None}
+        self.async_bots.reset()
         self.refresh()
 
     def _is_bot_turn(self, board: int) -> bool:
@@ -510,28 +517,35 @@ class App:
     # Boucle
     # ------------------------------------------------------------------
     def run_bots(self) -> None:
-        g = self.game
-        now = monotonic()
-        for b in (0, 1):
-            seat = Seat(b, g.turn(b))
-            if g.is_over or g.clocks.paused or not self.bot_vars[seat].get() or g.is_blocked(b):
-                self.ready[b] = None
-            elif self.ready[b] is None:
-                self.ready[b] = now + self.delay_var.get() * random.uniform(0.5, 1.5)
-            elif now >= self.ready[b]:
-                self.ready[b] = None
-                try:
-                    self.say("[bot] " + describe(g.push(b, self.players[seat].choose_move(g, b))))
-                except BughouseError:
-                    pass
+        for entry in self.async_bots.poll(
+            self.game,
+            self.players,
+            enabled=lambda seat: self.bot_vars[seat].get(),
+            delay=lambda: self.delay_var.get() * random.uniform(0.5, 1.5),
+            on_error=self.say,
+        ):
+            self.say("[bot] " + describe(entry))
 
     def _tick(self) -> None:
+        if self._closed:
+            return
         try:
             self.game.check_time()
             self.run_bots()
             self.refresh()
         finally:
-            self.root.after(self.TICK_MS, self._tick)
+            if not self._closed:
+                self._after_id = self.root.after(self.TICK_MS, self._tick)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._after_id is not None:
+            self.root.after_cancel(self._after_id)
+            self._after_id = None
+        self.async_bots.shutdown()
+        self.root.destroy()
 
     def refresh(self) -> None:
         g = self.game
@@ -579,8 +593,10 @@ def main(argv: list[str] | None = None) -> None:
         root = tk.Tk()
     except tk.TclError as exc:
         raise SystemExit(f"Impossible d'ouvrir une fenêtre : {exc}")
-    App(root, TimeControl(args.base, args.increment), bots=seats,
-        bot_type="Minimax" if args.bot_type == "minimax" else "Aléatoire")
+    app = App(root, TimeControl(args.base, args.increment), bots=seats,
+              bot_type="Minimax" if args.bot_type == "minimax" else "Aléatoire")
+    if app.async_bots.fallback_reason:
+        app.say(app.async_bots.fallback_reason)
     root.mainloop()
 
 

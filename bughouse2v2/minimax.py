@@ -111,7 +111,19 @@ class MinimaxPlayer:
     # Recherche
     # ------------------------------------------------------------------
     def _f_pawn_safety(self, board: chess.Board, color: chess.Color) -> float:
-        """Sécurité du pion f de ``color`` : défenseurs - attaquants (pion absent = côté affaibli)."""
+        """Protection de f2/f7, neutralisée en configuration de roque.
+
+        La position des pièces suffit : aucun historique de roque n'est requis,
+        ce qui fonctionne aussi sur les copies de recherche sans pile de coups.
+        """
+        rank = 0 if color == chess.WHITE else 7
+        king_square = board.king(color)
+        for king_file, rook_file in ((6, 5), (2, 3)):
+            if king_square == chess.square(king_file, rank):
+                rook = board.piece_at(chess.square(rook_file, rank))
+                if rook is not None and rook.piece_type == chess.ROOK and rook.color == color:
+                    return 0.0
+
         sq = chess.F2 if color == chess.WHITE else chess.F7
         p = board.piece_at(sq)
         if p is None or p.piece_type != chess.PAWN or p.color != color:
@@ -120,20 +132,32 @@ class MinimaxPlayer:
         attackers = len(board.attackers(not color, sq))
         return self.f_pawn_weight * (min(defenders, 3) - attackers)
 
-    def _eval(self, board):
+    def _center_score(self, board: chess.Board, color: chess.Color) -> float:
+        """Occupation et contrôle géométrique de d4/e4/d5/e5."""
+        score = 0.0
+        for square in (chess.D4, chess.E4, chess.D5, chess.E5):
+            piece = board.piece_at(square)
+            if piece is not None and piece.color == color:
+                if piece.piece_type == chess.PAWN:
+                    score += 20
+                elif piece.piece_type in (chess.KNIGHT, chess.BISHOP):
+                    score += 12
+            for origin in board.attackers(color, square):
+                attacker = board.piece_at(origin)
+                if attacker.piece_type == chess.PAWN:
+                    score += 8
+                elif attacker.piece_type in (chess.KNIGHT, chess.BISHOP):
+                    score += 5
+                elif attacker.piece_type in (chess.ROOK, chess.QUEEN):
+                    score += 2
+        return score
+
+    def _eval(self, board: chess.Board) -> float:
+        """Évaluation à l'horizon, du point de vue du camp au trait (négamax)."""
         me = board.turn
-
-        king_safety = (
-            self._f_pawn_safety(board, me)
-            - self._f_pawn_safety(board, not me)
-        )
-
-        center = (
-            self._center_score(board, me)
-            - self._center_score(board, not me)
-        )
-
-        return 2*king_safety + center
+        king_safety = self._f_pawn_safety(board, me) - self._f_pawn_safety(board, not me)
+        center = self._center_score(board, me) - self._center_score(board, not me)
+        return 2 * king_safety + center
 
     def _gain(self, move: chess.Move, victim: int | None) -> float:
         g = VALUES[victim] * (1 + self.hand_bonus) if victim else 0.0
@@ -177,30 +201,6 @@ class MinimaxPlayer:
                 best_move, best_val = move, v
             alpha = max(alpha, v)
         return best_move, best_val
-
-
-    def _center_score(self, board, color):
-        score = 0.0
-        for square in (chess.D4, chess.E4, chess.D5, chess.E5):
-            piece = board.piece_at(square)
-
-            if piece is not None and piece.color == color:
-                if piece.piece_type == chess.PAWN:
-                    score += 20
-                elif piece.piece_type in (chess.KNIGHT, chess.BISHOP):
-                    score += 12
-
-            for origin in board.attackers(color, square):
-                attacker = board.piece_at(origin)
-
-                if attacker.piece_type == chess.PAWN:
-                    score += 8
-                elif attacker.piece_type in (chess.KNIGHT, chess.BISHOP):
-                    score += 5
-                elif attacker.piece_type in (chess.ROOK, chess.QUEEN):
-                    score += 2
-
-        return score
 
     def _search(self, board: chess.Board, depth: int, alpha: float, beta: float) -> float:
         """Valeur du point de vue du camp au trait. Gain d'un coup = prise (x bonus) + promotion ;
