@@ -9,6 +9,7 @@ case libre. Ctrl+Z annule le dernier coup. Cocher « Bot » à côté d'une plac
 par ``RandomPlayer`` (ou par le joueur que tu passes à ``App(players=...)``).
 """
 from __future__ import annotations
+import os
 
 if __package__ in (None, ""):  # lancé comme un simple script (python gui.py, bouton « Run » d'un IDE)
     import os
@@ -59,6 +60,7 @@ PIECE_FONT = {"Windows": "Segoe UI Symbol", "Darwin": "Apple Symbols"}.get(platf
 GLYPH_FILLED = {chess.PAWN: "♟", chess.KNIGHT: "♞", chess.BISHOP: "♝", chess.ROOK: "♜", chess.QUEEN: "♛", chess.KING: "♚"}
 GLYPH_HOLLOW = {chess.PAWN: "♙", chess.KNIGHT: "♘", chess.BISHOP: "♗", chess.ROOK: "♖", chess.QUEEN: "♕", chess.KING: "♔"}
 POCKET_ORDER = (chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT, chess.PAWN)
+BOT_TYPES = {"Aléatoire": RandomPlayer, "Minimax": MinimaxPlayer}
 
 
 def format_time(t: float) -> str:
@@ -240,10 +242,11 @@ class App:
         control: TimeControl = TimeControl(180.0, 0.0),
         *,
         bots: set[Seat] | frozenset[Seat] = frozenset(),
-        players: dict[Seat, Player] | None = None,
+        bot_type: str = "Aléatoire",
     ) -> None:
         self.root = root
-        self.players: dict[Seat, Player] = players or {s: RandomPlayer(f"bot-{s}") for s in ALL_SEATS}
+        self.bot_type = {s: tk.StringVar(value=bot_type) for s in ALL_SEATS}
+        self.players: dict[Seat, Player] = {s: BOT_TYPES[bot_type](f"bot-{s}") for s in ALL_SEATS}
         self.bot_vars = {s: tk.BooleanVar(value=s in bots) for s in ALL_SEATS}
         self.base_var = tk.StringVar(value=f"{control.base:g}")
         self.inc_var = tk.StringVar(value=f"{control.increment:g}")
@@ -287,6 +290,10 @@ class App:
         bots.pack(side=tk.TOP, fill=tk.X, padx=6)
         for seat in ALL_SEATS:
             tk.Checkbutton(bots, text=f"Bot {seat}", variable=self.bot_vars[seat], command=self._bots_changed).pack(side=tk.LEFT)
+            tk.OptionMenu(
+                bots, self.bot_type[seat], *BOT_TYPES,
+                command=lambda _v, s=seat: self._bot_type_changed(s),
+            ).pack(side=tk.LEFT, padx=(0, 8))
         tk.Label(bots, text="  délai bots (s)").pack(side=tk.LEFT)
         tk.Scale(bots, variable=self.delay_var, from_=0.0, to=3.0, resolution=0.1, orient=tk.HORIZONTAL, length=120).pack(side=tk.LEFT)
         tk.Label(bots, text="   Équipes : AW+BB  contre  AB+BW", fg="#555555").pack(side=tk.LEFT)
@@ -345,6 +352,10 @@ class App:
         self.ready = {0: None, 1: None}
         self.say(f"annulé : {entry.seat} {entry.san}" if entry else "rien à annuler")
         self.refresh()
+
+    def _bot_type_changed(self, seat: Seat) -> None:
+        self.players[seat] = BOT_TYPES[self.bot_type[seat].get()](f"bot-{seat}")
+        self.ready = {0: None, 1: None}
 
     def toggle_pause(self) -> None:
         try:
@@ -487,8 +498,9 @@ def main(argv: list[str] | None = None) -> None:
         root = tk.Tk()
     except tk.TclError as exc:
         raise SystemExit(f"Impossible d'ouvrir une fenêtre : {exc}")
-    make = MinimaxPlayer if args.bot_type == "minimax" else RandomPlayer
-    App(root, TimeControl(args.base, args.increment), bots=seats, players={s: make(f"bot-{s}") for s in ALL_SEATS})
+    # make = MinimaxPlayer if args.bot_type == "minimax" else RandomPlayer
+    App(root, TimeControl(args.base, args.increment), bots=seats,
+        bot_type="Minimax" if args.bot_type == "minimax" else "Aléatoire")
     root.mainloop()
 
 

@@ -65,6 +65,7 @@ class MinimaxPlayer:
         moves_to_go: int = 40,  # budget par coup = temps restant / moves_to_go + 0.8 * incrément
         min_time: float = 0.05,
         max_time: float = 1.0,
+        f_pawn_weight: float = 40.0,  # poids de la protection du pion f2/f7 (100 = un pion)
     ) -> None:
         self.name = name
         self.max_depth, self.gamma, self.hand_bonus = max_depth, gamma, hand_bonus
@@ -73,7 +74,7 @@ class MinimaxPlayer:
         self.last_depth = 0  # profondeur atteinte au dernier coup (pour le debug)
         self.last_score = 0.0
         self.nodes = 0
-
+        self.f_pawn_weight = f_pawn_weight
     # ------------------------------------------------------------------
     # Interface Player
     # ------------------------------------------------------------------
@@ -109,6 +110,21 @@ class MinimaxPlayer:
     # ------------------------------------------------------------------
     # Recherche
     # ------------------------------------------------------------------
+    def _f_pawn_safety(self, board: chess.Board, color: chess.Color) -> float:
+        """Sécurité du pion f de ``color`` : défenseurs - attaquants (pion absent = côté affaibli)."""
+        sq = chess.F2 if color == chess.WHITE else chess.F7
+        p = board.piece_at(sq)
+        if p is None or p.piece_type != chess.PAWN or p.color != color:
+            return -self.f_pawn_weight
+        defenders = len(board.attackers(color, sq))
+        attackers = len(board.attackers(not color, sq))
+        return self.f_pawn_weight * (min(defenders, 3) - attackers)
+
+    def _eval(self, board: chess.Board) -> float:
+        """Évaluation à l'horizon, du point de vue du camp au trait (négamax)."""
+        me = board.turn
+        return self._f_pawn_safety(board, me) - self._f_pawn_safety(board, not me)
+
     def _gain(self, move: chess.Move, victim: int | None) -> float:
         g = VALUES[victim] * (1 + self.hand_bonus) if victim else 0.0
         if move.promotion:
@@ -159,8 +175,9 @@ class MinimaxPlayer:
         if self.nodes & 255 == 0 and time.perf_counter() > self._deadline:
             raise _Timeout
         if depth == 0:
-            # horizon : on ne détecte que le mat (coûteux, donc seulement si on est en échec)
-            return -MATE if board.is_check() and not any(board.legal_moves) else 0.0
+            if board.is_check() and not any(board.legal_moves):
+                return -MATE
+            return self._eval(board)
         moves = self._ordered(board)
         if not moves:  # mat (ou pat : en bughouse on attend simplement une pièce, pas de nulle)
             return -MATE if board.is_check() else 0.0

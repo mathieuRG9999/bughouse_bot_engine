@@ -104,6 +104,21 @@ class Game:
         """Le joueur au trait n'a aucun coup (ex. pat) : il attend une pièce du partenaire."""
         return not self.boards[board].legal_moves
 
+    def unblocking_types(self, board: int) -> set[int]:
+        """Types de pièces qui libéreraient le joueur au trait sur ``board`` s'il en recevait une.
+
+        Vide si ce joueur a déjà un coup légal (rien à protéger)."""
+        b = self.boards[board].copy(stack=False)
+        if any(b.legal_moves):
+            return set()
+        out = set()
+        for pt in (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN):
+            b.pockets[b.turn].add(pt)
+            if any(b.legal_moves):
+                out.add(pt)
+            b.pockets[b.turn].remove(pt)
+        return out
+
     def pocket(self, board: int, color: chess.Color) -> dict[int, int]:
         pocket = self.boards[board].pockets[color]
         return {pt: pocket.count(pt) for pt in chess.PIECE_TYPES if pocket.count(pt)}
@@ -195,7 +210,7 @@ class Game:
         )
         self.history.append(entry)
 
-        if b.is_checkmate():
+        if b.is_checkmate() and not self.unblocking_types(board):
             self._finish(Result(seat.team, Termination.CHECKMATE, Seat(board, not mover)))
         return entry
 
